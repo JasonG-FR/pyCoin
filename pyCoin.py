@@ -177,16 +177,28 @@ def main(currency, symbols):
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description='Displays cryptocurrencies data from CMC in the terminal')
+    supported_currencies = ["AUD", "BRL", "CAD", "CHF", "CLP", "CNY", "CZK", "DKK", "EUR",
+                            "GBP", "HKD", "HUF", "IDR", "ILS", "INR", "JPY", "KRW", "MXN",
+                            "MYR", "NOK", "NZD", "PHP", "PKR", "PLN", "RUB", "SEK", "SGD",
+                            "THB", "TRY", "TWD", "ZAR", "BTC", "ETH", "XRP", "LTC", "BCH"]
 
+    parser = argparse.ArgumentParser(description='Displays cryptocurrencies data from CMC in the terminal')
     parser.add_argument('--curr', default='USD', type=str,
-                        help='Currency used for the price and volume')
+                        help=f'Currency used for the price and volume. \
+                               Valid currency values: {bold(", ".join(supported_currencies))}')
     parser.add_argument('--crypt', default=None, type=str,
                         help='Symbols of the cryptocurrencies to display. Default top 10.')
 
     args = parser.parse_args()
-    # TODO: check if the currency is supported by CMC, if not use USD
-    # TODO: add multiple currencies support (ex: USD,EUR,BCT)
+
+    # Check if the currency is supported by CMC, if not use USD
+    for curr in args.curr.upper().split(","):
+        if curr not in supported_currencies + ["USD"]:
+            print(color(f"'{args.curr.upper()}' is not a valid currency value", 'p'))
+            args.curr = 'USD'
+            break
+
+    # TODO: add the source and timestamp
     # TODO: add the possibility to sort by rank (default), value, volume, 24h pourcentage or keep the args order
 
     if args.crypt:
