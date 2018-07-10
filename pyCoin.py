@@ -35,11 +35,13 @@ class Crypto(object):
 
 
 class bcolors:
-    PINK = '\033[95m'
+    WHITE = '\033[97m'
+    CYAN = '\033[36m'
+    MAGENTA = '\033[35m'
     BLUE = '\033[94m'
-    GREEN = '\033[92m'
+    GREEN = '\033[32m'
     YELLOW = '\033[93m'
-    RED = '\033[91m'
+    RED = '\033[31m'
     ENDC = '\033[0m'
     BOLD = '\033[1m'
 
@@ -49,7 +51,8 @@ def bold(text):
 
 
 def color(text, color):
-    colors = {"p": bcolors.PINK, "b": bcolors.BLUE, "g": bcolors.GREEN, "y": bcolors.YELLOW, "r": bcolors.RED}
+    colors = {"m": bcolors.MAGENTA, "b": bcolors.BLUE, "y": bcolors.YELLOW,
+              "w": bcolors.WHITE, "c": bcolors.CYAN, "r": bcolors.RED, "g": bcolors.GREEN}
     return colors[color] + str(text) + bcolors.ENDC
 
 
@@ -99,7 +102,7 @@ def get_symbols(cryptos, symbols, convert="USD"):
                 selected.add(cryptos[symbol])
 
         else:
-            print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'p'))
+            print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'm'))
 
     return list(selected)
 
@@ -169,7 +172,7 @@ def print_selection_multitab(selection, sort_value):
         print(color(bold("\n> " + currency), "y"))
         print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
     # Print the source and timestamp
-    print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\nSource: {color('https://www.coinmarketcap.com', 'w')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def main(currency, symbols, sort_value):
@@ -182,9 +185,10 @@ def main(currency, symbols, sort_value):
     else:
         selection = get_top_10(cryptos, currency)
 
-    # Print the selection
-    # print_selection_onetab(selection, sort_value)
-    print_selection_multitab(selection, sort_value)
+    # Print the selection if any
+    if selection:
+        # print_selection_onetab(selection, sort_value)
+        print_selection_multitab(selection, sort_value)
 
 
 if __name__ == '__main__':
@@ -215,7 +219,7 @@ if __name__ == '__main__':
     # Check if the currency is supported by CMC, if not use 'USD'
     for curr in args.curr.split(","):
         if curr not in supported_currencies + ["USD"]:
-            print(color(f"'{args.curr}' is not a valid currency value, using 'USD'", 'p'))
+            print(color(f"'{args.curr}' is not a valid currency value, using 'USD'", 'm'))
             args.curr = 'USD'
             break
 
