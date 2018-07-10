@@ -106,13 +106,13 @@ def get_symbols(cryptos, symbols, convert="USD"):
                 selected.add(cryptos[symbol])
 
         else:
-            print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'y'))
+            print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'p'))
 
     # Sort the result by rank
     return sorted(list(selected), key=lambda x: x.rank, reverse=False)
 
 
-def print_selection(selection):
+def print_selection_onetab(selection):
     # Generate a list of lists containing the data to print
     to_print = []
     for item in selection:
@@ -135,6 +135,29 @@ def print_selection(selection):
     print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
 
 
+def print_selection_multitab(selection):
+    for currency in selection[0].currencies:
+        # Generate a list of lists containing the data to print
+        to_print = []
+        for item in selection:
+            price = item.currencies[currency]['price']
+            volume = item.currencies[currency]['volume_24h']
+            percentage_24h = color_percent(item.currencies[currency]['percent_change_24h'])
+            percentage_7d = color_percent(item.currencies[currency]['percent_change_7d'])
+            data = [bold(item.rank), item.symbol, item.name, price, percentage_24h, percentage_7d, volume]
+            to_print.append(data)
+
+        headers = ["Rank", "Symbol", "Name", f"Price ({currency})", f"24h-Change ({currency})",
+                   f"7d-Change ({currency})", f"24h-Volume ({currency})"]
+        headers = [bold(h) for h in headers]
+
+        floatfmt = ["", "", "", f"{'.8f' if currency == 'BTC' else '.4f'}", ".2%",
+                    ".2%", f"{'.4f' if currency == 'BTC' else ',.0f'}"]
+
+        print(color(bold("\n" + currency), "y"))
+        print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
+
+
 def main(currency, symbols):
     # Load the crypto ids from CMC
     cryptos = load_cmc_ids()
@@ -146,7 +169,8 @@ def main(currency, symbols):
         selection = get_top_10(cryptos, currency)
 
     # Print the selection
-    print_selection(selection)
+    # print_selection_onetab(selection)
+    print_selection_multitab(selection)
 
 
 if __name__ == '__main__':
