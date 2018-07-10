@@ -1,5 +1,6 @@
 import requests
 from tabulate import tabulate
+from datetime import datetime
 
 
 class Crypto(object):
@@ -126,6 +127,8 @@ def print_selection_onetab(selection):
                [".2%" for _ in range(len(currencies) * 2)] + [".4f" if c == 'BTC' else ",.0f" for c in currencies]
 
     print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
+    # Print the source and timestamp
+    print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def print_selection_multitab(selection):
@@ -147,8 +150,10 @@ def print_selection_multitab(selection):
         floatfmt = ["", "", "", f"{'.8f' if currency == 'BTC' else '.4f'}", ".2%",
                     ".2%", f"{'.4f' if currency == 'BTC' else ',.0f'}"]
 
-        print(color(bold("\n" + currency), "y"))
+        print(color(bold("\n> " + currency), "y"))
         print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
+    # Print the source and timestamp
+    print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def main(currency, symbols):
@@ -190,7 +195,6 @@ if __name__ == '__main__':
             args.curr = 'USD'
             break
 
-    # TODO: add the source and timestamp
     # TODO: add the possibility to sort by rank (default), value, volume, 24h pourcentage or keep the args order
 
     if args.crypt:
