@@ -89,6 +89,20 @@ def get_top_10(cryptos, convert="USD"):
         raise ConnectionError(f"{url} [{r.status_code}]")
 
 
+def get_symbols(cryptos, symbols, convert="USD"):
+    selected = []
+    for symbol in symbols.split(","):
+        if symbol in cryptos:
+            cryptos[symbol].get_ticker(convert)
+            selected.append(cryptos[symbol])
+
+        else:
+            print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'y'))
+
+    # Sort the result by rank
+    return sorted(selected, key=lambda x: x.rank, reverse=False)
+
+
 def print_selection(selection):
     # Generate a list of tuple containing the data to print
     to_print = []
@@ -105,16 +119,35 @@ def print_selection(selection):
     print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
 
 
-def main():
+def main(currency, symbols):
     # Load the crypto ids from CMC
     cryptos = load_cmc_ids()
 
     # Get the tickers of the top 10 cryptos
-    selection = get_top_10(cryptos)
+    if symbols:
+        selection = get_symbols(cryptos, symbols, currency)
+    else:
+        selection = get_top_10(cryptos, currency)
 
     # Print the selection
     print_selection(selection)
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Displays cryptocurrencies data from CMC in the terminal')
+
+    parser.add_argument('--curr', default='USD', type=str,
+                        help='Currency used for the price and volume')
+    parser.add_argument('--crypt', default=None, type=str, 
+                        help='Symbols of the cryptocurrencies to display. Default top 10.')
+
+    args = parser.parse_args()
+    # TODO: check if the currency is supported by CMC, if not use USD
+    # TODO: add the possibility to sort by rank (default), value, volume, 24h pourcentage or keep the args order
+
+    if args.crypt:
+        main(args.curr.upper(), args.crypt.upper().replace(" ", ""))
+    else:
+        main(args.curr.upper(), None)
