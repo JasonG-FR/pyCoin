@@ -87,8 +87,7 @@ def get_top_10(cryptos, convert="USD"):
         else:
             raise ConnectionError(f"{url} [{r.status_code}]")
 
-    # Sort the result by rank
-    return sorted(list(selected), key=lambda x: x.rank, reverse=False)
+    return list(selected)
 
 
 def get_symbols(cryptos, symbols, convert="USD"):
@@ -102,13 +101,26 @@ def get_symbols(cryptos, symbols, convert="USD"):
         else:
             print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'p'))
 
-    # Sort the result by rank
-    return sorted(list(selected), key=lambda x: x.rank, reverse=False)
+    return list(selected)
 
 
-def print_selection_onetab(selection):
+def sort_selection(selection, sort_value, currency):
+    cases = {"rank": lambda x: x.rank,
+             "price": lambda x: x.currencies[currency]["price"],
+             "change_24h": lambda x: x.currencies[currency]["percent_change_24h"],
+             "change_7d": lambda x: x.currencies[currency]["percent_change_7d"],
+             "volume": lambda x: x.currencies[currency]["volume_24h"]}
+
+    return sorted(selection, key=cases[sort_value.replace("-", "")], reverse="-" not in sort_value)
+
+
+def print_selection_onetab(selection, sort_value):
     # Generate a list of lists containing the data to print
     to_print = []
+
+    # Sort the selection
+    selection = sort_selection(selection, sort_value, selection[0].currencies[0])
+
     for item in selection:
         prices = [item.currencies[c]['price'] for c in item.currencies]
         volumes = [item.currencies[c]['volume_24h'] for c in item.currencies]
@@ -131,10 +143,14 @@ def print_selection_onetab(selection):
     print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def print_selection_multitab(selection):
+def print_selection_multitab(selection, sort_value):
     for currency in selection[0].currencies:
         # Generate a list of lists containing the data to print
         to_print = []
+
+        # Sort the selection
+        selection = sort_selection(selection, sort_value, currency)
+
         for item in selection:
             price = item.currencies[currency]['price']
             volume = item.currencies[currency]['volume_24h']
@@ -156,7 +172,7 @@ def print_selection_multitab(selection):
     print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def main(currency, symbols):
+def main(currency, symbols, sort_value):
     # Load the crypto ids from CMC
     cryptos = load_cmc_ids()
 
@@ -167,8 +183,8 @@ def main(currency, symbols):
         selection = get_top_10(cryptos, currency)
 
     # Print the selection
-    # print_selection_onetab(selection)
-    print_selection_multitab(selection)
+    # print_selection_onetab(selection, sort_value)
+    print_selection_multitab(selection, sort_value)
 
 
 if __name__ == '__main__':
@@ -178,26 +194,32 @@ if __name__ == '__main__':
                             "GBP", "HKD", "HUF", "IDR", "ILS", "INR", "JPY", "KRW", "MXN",
                             "MYR", "NOK", "NZD", "PHP", "PKR", "PLN", "RUB", "SEK", "SGD",
                             "THB", "TRY", "TWD", "ZAR", "BTC", "ETH", "XRP", "LTC", "BCH"]
+    sorts = ["rank", "rank-", "price", "price-", "change_24h", "change_24h-",
+             "change_7d", "change_7d-", "volume", "volume-"]
 
     parser = argparse.ArgumentParser(description='Displays cryptocurrencies data from CMC in the terminal')
     parser.add_argument('--curr', default='USD', type=str,
-                        help=f'Currency used for the price and volume. \
-                               Valid currency values: {bold(", ".join(supported_currencies))}')
-    parser.add_argument('--crypt', default=None, type=str,
-                        help='Symbols of the cryptocurrencies to display. Default top 10.')
+                        help=f'Currency used for the price and volume \
+                        (for more than one, separate them with a comma : USB,BTC). \
+                        Valid currencies: {bold(", ".join(supported_currencies))}')
+    parser.add_argument('--crypto', default=None, type=str,
+                        help='Symbols of the cryptocurrencies to display (default top10).')
+    parser.add_argument('--sort', default='rank-', type=str, choices=sorts,
+                        help='How the cryptocurrencies are sorted in the table.')
 
     args = parser.parse_args()
 
-    # Check if the currency is supported by CMC, if not use USD
-    for curr in args.curr.upper().split(","):
+    args.curr = args.curr.upper()
+    args.sort = args.sort.lower()
+
+    # Check if the currency is supported by CMC, if not use 'USD'
+    for curr in args.curr.split(","):
         if curr not in supported_currencies + ["USD"]:
-            print(color(f"'{args.curr.upper()}' is not a valid currency value", 'p'))
+            print(color(f"'{args.curr}' is not a valid currency value, using 'USD'", 'p'))
             args.curr = 'USD'
             break
 
-    # TODO: add the possibility to sort by rank (default), value, volume, 24h pourcentage or keep the args order
-
-    if args.crypt:
-        main(args.curr.upper(), args.crypt.upper().replace(" ", ""))
+    if args.crypto:
+        main(args.curr, args.crypto.upper().replace(" ", ""), args.sort)
     else:
-        main(args.curr.upper(), None)
+        main(args.curr, None, args.sort)
