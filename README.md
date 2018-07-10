@@ -1,5 +1,9 @@
 # pyCoin
-A python script (CLI) for displaying crypto currencies data from CMC in a terminal
+A python script (CLI) for displaying crypto currencies data from CMC in the terminal
+
+![logo_pyCoin](logo_pyCoin_200px.png)
+
+Logo attribution: [Snake](https://thenounproject.com/vishal.marotkar/uploads/?i=316335) by **V I S H A L** & [crypto currency](https://thenounproject.com/term/crypto-currency/1372103) by **Iconika** from the [Noun Project](https://thenounproject.com)
 
 ## Help
 `$ python pyCoin.py -h`
