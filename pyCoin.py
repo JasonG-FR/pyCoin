@@ -17,15 +17,7 @@ class Crypto(object):
         if r.status_code == 200:
             # Add the ticker value from the JSON
             ticker = r.json()["data"]
-            self.rank = ticker["rank"]
-            data = {"price": ticker["quotes"][convert]["price"],
-                    "volume_24h": ticker["quotes"][convert]["volume_24h"],
-                    "percent_change_24h": ticker["quotes"][convert]["percent_change_24h"],
-                    "percent_change_7d": ticker["quotes"][convert]["percent_change_7d"]}
-            if self.currencies:
-                self.currencies[convert] = data
-            else:
-                self.currencies = {convert: data}
+            self.set_ticker(ticker, convert)
         else:
             raise ConnectionError(f"{url} [{r.status_code}]")
 
@@ -68,7 +60,7 @@ def color_percent(value):
 
 
 def load_cmc_ids():
-    # Get the JSON file from CMC API : https://api.coinmarketcap.com/v2/listings/
+    # Get the JSON file from CMC API
     url = "https://api.coinmarketcap.com/v2/listings/"
     r = requests.get(url, timeout=10)
 
