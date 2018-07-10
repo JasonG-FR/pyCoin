@@ -8,6 +8,7 @@ class Crypto(object):
         self.name = data["name"]
         self.symbol = data["symbol"]
         self.website_slug = data["website_slug"]
+        self.currencies = None
 
     def get_ticker(self, convert="USD"):
         url = f"https://api.coinmarketcap.com/v2/ticker/{self.id}/?convert={convert}"
@@ -17,21 +18,27 @@ class Crypto(object):
             # Add the ticker value from the JSON
             ticker = r.json()["data"]
             self.rank = ticker["rank"]
-            self.price = ticker["quotes"][convert]["price"]
-            self.percent_change_24h = ticker["quotes"][convert]["percent_change_24h"]
-            self.percent_change_7d = ticker["quotes"][convert]["percent_change_7d"]
-            self.volume_24h = ticker["quotes"][convert]["volume_24h"]
-            self.currency = convert
+            data = {"price": ticker["quotes"][convert]["price"],
+                    "volume_24h": ticker["quotes"][convert]["volume_24h"],
+                    "percent_change_24h": ticker["quotes"][convert]["percent_change_24h"],
+                    "percent_change_7d": ticker["quotes"][convert]["percent_change_7d"]}
+            if self.currencies:
+                self.currencies[convert] = data
+            else:
+                self.currencies = {convert: data}
         else:
             raise ConnectionError(f"{url} [{r.status_code}]")
 
     def set_ticker(self, ticker, convert):
         self.rank = ticker["rank"]
-        self.price = ticker["quotes"][convert]["price"]
-        self.percent_change_24h = ticker["quotes"][convert]["percent_change_24h"]
-        self.percent_change_7d = ticker["quotes"][convert]["percent_change_7d"]
-        self.volume_24h = ticker["quotes"][convert]["volume_24h"]
-        self.currency = convert
+        data = {"price": ticker["quotes"][convert]["price"],
+                "volume_24h": ticker["quotes"][convert]["volume_24h"],
+                "percent_change_24h": ticker["quotes"][convert]["percent_change_24h"],
+                "percent_change_7d": ticker["quotes"][convert]["percent_change_7d"]}
+        if self.currencies:
+            self.currencies[convert] = data
+        else:
+            self.currencies = {convert: data}
 
 
 class bcolors:
@@ -73,53 +80,58 @@ def load_cmc_ids():
 
 
 def get_top_10(cryptos, convert="USD"):
-    url = f"https://api.coinmarketcap.com/v2/ticker/?limit=10&convert={convert}"
-    r = requests.get(url, timeout=10)
+    selected = set()
+    for conv in convert.split(","):
+        url = f"https://api.coinmarketcap.com/v2/ticker/?limit=10&convert={conv}"
+        r = requests.get(url, timeout=10)
 
-    if r.status_code == 200:
-        # Parse the JSON and update the Crypto objects
-        data = r.json()['data']
-        selected = []
-        for key in data:
-            cryptos[data[key]["symbol"]].set_ticker(data[key], convert)
-            selected.append(cryptos[data[key]["symbol"]])
+        if r.status_code == 200:
+            # Parse the JSON and update the Crypto objects
+            data = r.json()['data']
+            for key in data:
+                cryptos[data[key]["symbol"]].set_ticker(data[key], conv)
+                selected.add(cryptos[data[key]["symbol"]])
 
-        return selected
-    else:
-        raise ConnectionError(f"{url} [{r.status_code}]")
+            return sorted(list(selected), key=lambda x: x.rank, reverse=False)
+        else:
+            raise ConnectionError(f"{url} [{r.status_code}]")
 
 
 def get_symbols(cryptos, symbols, convert="USD"):
-    selected = []
+    selected = set()
     for symbol in symbols.split(","):
         if symbol in cryptos:
-            cryptos[symbol].get_ticker(convert)
-            selected.append(cryptos[symbol])
+            for conv in convert.split(","):
+                cryptos[symbol].get_ticker(conv)
+                selected.add(cryptos[symbol])
 
         else:
             print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'y'))
 
     # Sort the result by rank
-    return sorted(selected, key=lambda x: x.rank, reverse=False)
+    return sorted(list(selected), key=lambda x: x.rank, reverse=False)
 
 
 def print_selection(selection):
-    # Generate a list of tuple containing the data to print
+    # Generate a list of lists containing the data to print
     to_print = []
     for item in selection:
-        data = (bold(item.rank), item.symbol, item.name, item.price, color_percent(item.percent_change_24h),
-                color_percent(item.percent_change_7d), item.volume_24h)
+        prices = [item.currencies[c]['price'] for c in item.currencies]
+        volumes = [item.currencies[c]['volume_24h'] for c in item.currencies]
+        percentages_24h = [color_percent(item.currencies[c]['percent_change_24h']) for c in item.currencies]
+        percentages_7d = [color_percent(item.currencies[c]['percent_change_7d']) for c in item.currencies]
+        data = [bold(item.rank), item.symbol, item.name] + prices + percentages_24h + percentages_7d + volumes
         to_print.append(data)
 
-    currency = selection[0].currency
-    headers = ["Rank", "Symbol", "Name", f"Price ({currency})", "24h-Change",
-               "7d-Change", f"24h-Volume  ({currency})"]
+    currencies = selection[0].currencies
+    headers = ["Rank", "Symbol", "Name"] + [f"Price ({c})" for c in currencies] + \
+              [f"24h-Change ({c})" for c in currencies] + [f"7d-Change ({c})" for c in currencies] + \
+              [f"24h-Volume ({c})" for c in currencies]
     headers = [bold(h) for h in headers]
 
-    if currency == "BTC":
-        floatfmt = ("", "", "", ".8f", ".2%", ".2%", ".4f")
-    else:
-        floatfmt = ("", "", "", ".4f", ".2%", ".2%", ",.0f")
+    floatfmt = ["", "", ""] + [".8f" if c == 'BTC' else ".4f" for c in currencies] + \
+               [".2%" for _ in range(len(currencies) * 2)] + [".4f" if c == 'BTC' else ",.0f" for c in currencies]
+
     print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
 
 
