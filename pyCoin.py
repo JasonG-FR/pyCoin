@@ -91,10 +91,11 @@ def get_top_10(cryptos, convert="USD"):
             for key in data:
                 cryptos[data[key]["symbol"]].set_ticker(data[key], conv)
                 selected.add(cryptos[data[key]["symbol"]])
-
-            return sorted(list(selected), key=lambda x: x.rank, reverse=False)
         else:
             raise ConnectionError(f"{url} [{r.status_code}]")
+
+    # Sort the result by rank
+    return sorted(list(selected), key=lambda x: x.rank, reverse=False)
 
 
 def get_symbols(cryptos, symbols, convert="USD"):
