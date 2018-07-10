@@ -28,8 +28,15 @@ Source: https://www.coinmarketcap.com - 2018-07-10 23:32:53
 
 ### Currencies
 Available currencies:
-Fiats: USD, AUD, BRL, CAD, CHF, CLP, CNY, CZK, DKK, EUR, GBP, HKD, HUF, IDR, ILS, INR, JPY, KRW, MXN, MYR, NOK, NZD, PHP, PKR, PLN, RUB, SEK, SGD, THB, TRY, TWD, ZAR
-Cryptos: BTC, ETH, XRP, LTC, BCH
+
+Fiats: 
+
+USD, AUD, BRL, CAD, CHF, CLP, CNY, CZK, DKK, EUR, GBP, HKD, HUF, IDR, ILS, INR, JPY, KRW, MXN, MYR, NOK, NZD, PHP, PKR, PLN, RUB, SEK, SGD, THB, TRY, TWD, ZAR
+
+
+Cryptos: 
+
+BTC, ETH, XRP, LTC, BCH
 
 #### Using another currency
 ```
@@ -90,22 +97,27 @@ Source: https://www.coinmarketcap.com - 2018-07-10 23:46:24
 ### Sorting
 #### Rank (default)
 Descending: `$ python pyCoin.py --sort rank`
+
 Ascending: `$ python pyCoin.py --sort rank-`
 
 #### Price
 Descending: `$ python pyCoin.py --sort price`
+
 Ascending: `$ python pyCoin.py --sort price-`
 
 #### 24h-change
 Descending: `$ python pyCoin.py --sort change_24h`
+
 Ascending: `$ python pyCoin.py --sort change_24h-`
 
 #### 7d-change
 Descending: `$ python pyCoin.py --sort change_7d`
+
 Ascending: `$ python pyCoin.py --sort change_7d-`
 
 #### Volume
 Descending: `$ python pyCoin.py --sort volume`
+
 Ascending: `$ python pyCoin.py --sort volume-`
 
 
