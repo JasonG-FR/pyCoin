@@ -115,7 +115,11 @@ def print_selection(selection):
     headers = ["Rank", "Symbol", "Name", f"Price ({currency})", "24h-Change",
                "7d-Change", f"24h-Volume  ({currency})"]
     headers = [bold(h) for h in headers]
-    floatfmt = ("", "", "", ".4f", ".2%", ".2%", ",.0f")
+
+    if currency == "BTC":
+        floatfmt = ("", "", "", ".8f", ".2%", ".2%", ".4f")
+    else:
+        floatfmt = ("", "", "", ".4f", ".2%", ".2%", ",.0f")
     print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
 
 
@@ -140,11 +144,12 @@ if __name__ == '__main__':
 
     parser.add_argument('--curr', default='USD', type=str,
                         help='Currency used for the price and volume')
-    parser.add_argument('--crypt', default=None, type=str, 
+    parser.add_argument('--crypt', default=None, type=str,
                         help='Symbols of the cryptocurrencies to display. Default top 10.')
 
     args = parser.parse_args()
     # TODO: check if the currency is supported by CMC, if not use USD
+    # TODO: add multiple currencies support (ex: USD,EUR,BCT)
     # TODO: add the possibility to sort by rank (default), value, volume, 24h pourcentage or keep the args order
 
     if args.crypt:
