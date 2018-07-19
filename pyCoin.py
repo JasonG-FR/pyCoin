@@ -156,7 +156,7 @@ def print_selection_onetab(selection, sort_value):
     print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
     # Print the source and timestamp
     print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - "
-          "{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+          f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def print_selection_multitab(selection, sort_value):
@@ -189,7 +189,7 @@ def print_selection_multitab(selection, sort_value):
         print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
     # Print the source and timestamp
     print(f"\nSource: {color('https://www.coinmarketcap.com', 'w')} - "
-          "{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+          f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def main(currency, symbols, sort_value):
