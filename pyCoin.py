@@ -1,6 +1,7 @@
 import requests
 from tabulate import tabulate
 from datetime import datetime
+from time import sleep
 
 
 class Crypto(object):
@@ -45,6 +46,7 @@ class bcolors:
     RED = '\033[31m'
     ENDC = '\033[0m'
     BOLD = '\033[1m'
+    CLEAR = '\033[H\033[J'
 
 
 def bold(text):
@@ -192,7 +194,7 @@ def print_selection_multitab(selection, sort_value):
           f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def main(currency, symbols, sort_value):
+def main(currency, symbols, sort_value, clear_scr):
     # Load the crypto ids from CMC
     cryptos = load_cmc_ids()
 
@@ -201,6 +203,10 @@ def main(currency, symbols, sort_value):
         selection = get_symbols(cryptos, symbols, currency)
     else:
         selection = get_top_10(cryptos, currency)
+
+    # Clear the screen if needed
+    if clear_scr:
+        print(bcolors.CLEAR)
 
     # Print the selection if any
     if selection:
@@ -223,15 +229,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Displays cryptocurrencies '
                                      'data from CMC in the terminal')
     parser.add_argument('--curr', default='USD', type=str,
-                        help=f'Currency used for the price and volume '
+                        help='Currency used for the price and volume '
                         '(for more than one, separate them with a comma : '
                         'USD,BTC). Valid currencies: '
-                        '{bold(", ".join(supported_currencies))}')
+                        f'{bold(", ".join(supported_currencies))}, '
+                        '(default USD)')
     parser.add_argument('--crypto', default=None, type=str,
                         help='Symbols of the cryptocurrencies to display '
                         '(default top10).')
     parser.add_argument('--sort', default='rank-', type=str, choices=sorts,
-                        help='Cryptocurrencies sorting in the table.')
+                        help='How to sort cryptos (default rank-)')
+    parser.add_argument('-d', '--delay', default=0, type=int,
+                        help='Autorefresh delay in seconds '
+                        '(default Autorefresh off)')
 
     args = parser.parse_args()
 
@@ -247,6 +257,14 @@ if __name__ == '__main__':
             break
 
     if args.crypto:
-        main(args.curr, args.crypto.upper().replace(" ", ""), args.sort)
-    else:
-        main(args.curr, None, args.sort)
+        args.crypto = args.crypto.upper().replace(" ", "")
+
+    while True:
+        try:
+            main(args.curr, args.crypto, args.sort, args.delay > 0)
+            if args.delay > 0:
+                sleep(args.delay)
+            else:
+                break
+        except KeyboardInterrupt:
+            break
