@@ -12,7 +12,8 @@ class Crypto(object):
         self.currencies = None
 
     def get_ticker(self, convert="USD"):
-        url = f"https://api.coinmarketcap.com/v2/ticker/{self.id}/?convert={convert}"
+        base_url = "https://api.coinmarketcap.com/v2/"
+        url = f"{base_url}ticker/{self.id}/?convert={convert}"
         r = requests.get(url, timeout=10)
 
         if r.status_code == 200:
@@ -22,16 +23,16 @@ class Crypto(object):
         else:
             raise ConnectionError(f"{url} [{r.status_code}]")
 
-    def set_ticker(self, ticker, convert):
+    def set_ticker(self, ticker, conv):
         self.rank = ticker["rank"]
-        data = {"price": ticker["quotes"][convert]["price"],
-                "volume_24h": ticker["quotes"][convert]["volume_24h"],
-                "percent_change_24h": ticker["quotes"][convert]["percent_change_24h"],
-                "percent_change_7d": ticker["quotes"][convert]["percent_change_7d"]}
+        keys = ["price", "volume_24h", "percent_change_24h",
+                "percent_change_7d"]
+        data = {key: ticker["quotes"][conv][key] for key in keys}
+
         if self.currencies:
-            self.currencies[convert] = data
+            self.currencies[conv] = data
         else:
-            self.currencies = {convert: data}
+            self.currencies = {conv: data}
 
 
 class bcolors:
@@ -52,7 +53,8 @@ def bold(text):
 
 def color(text, color):
     colors = {"m": bcolors.MAGENTA, "b": bcolors.BLUE, "y": bcolors.YELLOW,
-              "w": bcolors.WHITE, "c": bcolors.CYAN, "r": bcolors.RED, "g": bcolors.GREEN}
+              "w": bcolors.WHITE, "c": bcolors.CYAN, "r": bcolors.RED,
+              "g": bcolors.GREEN}
     return colors[color] + str(text) + bcolors.ENDC
 
 
@@ -77,8 +79,9 @@ def load_cmc_ids():
 
 def get_top_10(cryptos, convert="USD"):
     selected = set()
+    base_url = "https://api.coinmarketcap.com/v2/"
     for conv in convert.split(","):
-        url = f"https://api.coinmarketcap.com/v2/ticker/?limit=10&convert={conv}"
+        url = f"{base_url}ticker/?limit=10&convert={conv}"
         r = requests.get(url, timeout=10)
 
         if r.status_code == 200:
@@ -107,14 +110,15 @@ def get_symbols(cryptos, symbols, convert="USD"):
     return list(selected)
 
 
-def sort_selection(selection, sort_value, currency):
+def sort_selection(selection, sort_value, curr):
     cases = {"rank": lambda x: x.rank,
-             "price": lambda x: x.currencies[currency]["price"],
-             "change_24h": lambda x: x.currencies[currency]["percent_change_24h"],
-             "change_7d": lambda x: x.currencies[currency]["percent_change_7d"],
-             "volume": lambda x: x.currencies[currency]["volume_24h"]}
+             "price": lambda x: x.currencies[curr]["price"],
+             "change_24h": lambda x: x.currencies[curr]["percent_change_24h"],
+             "change_7d": lambda x: x.currencies[curr]["percent_change_7d"],
+             "volume": lambda x: x.currencies[curr]["volume_24h"]}
 
-    return sorted(selection, key=cases[sort_value.replace("-", "")], reverse="-" not in sort_value)
+    return sorted(selection, key=cases[sort_value.replace("-", "")],
+                  reverse="-" not in sort_value)
 
 
 def print_selection_onetab(selection, sort_value):
@@ -122,28 +126,37 @@ def print_selection_onetab(selection, sort_value):
     to_print = []
 
     # Sort the selection
-    selection = sort_selection(selection, sort_value, selection[0].currencies[0])
+    selection = sort_selection(selection, sort_value,
+                               selection[0].currencies[0])
 
     for item in selection:
-        prices = [item.currencies[c]['price'] for c in item.currencies]
-        volumes = [item.currencies[c]['volume_24h'] for c in item.currencies]
-        percentages_24h = [color_percent(item.currencies[c]['percent_change_24h']) for c in item.currencies]
-        percentages_7d = [color_percent(item.currencies[c]['percent_change_7d']) for c in item.currencies]
-        data = [bold(item.rank), item.symbol, item.name] + prices + percentages_24h + percentages_7d + volumes
+        currs = item.currencies
+        prices = [currs[c]['price'] for c in currs]
+        volumes = [currs[c]['volume_24h'] for c in currs]
+        percent_24h = [color_percent(currs[c]['percent_change_24h'])
+                       for c in currs]
+        percent_7d = [color_percent(currs[c]['percent_change_7d'])
+                      for c in currs]
+
+        data = [bold(item.rank), item.symbol, item.name]
+        data += prices + percent_24h + percent_7d + volumes
         to_print.append(data)
 
-    currencies = selection[0].currencies
-    headers = ["Rank", "Symbol", "Name"] + [f"Price ({c})" for c in currencies] + \
-              [f"24h-Change ({c})" for c in currencies] + [f"7d-Change ({c})" for c in currencies] + \
-              [f"24h-Volume ({c})" for c in currencies]
+    currs = selection[0].currencies
+    headers = ["Rank", "Symbol", "Name"] + [f"Price ({c})" for c in currs] + \
+              [f"24h-Change ({c})" for c in currs] + \
+              [f"7d-Change ({c})" for c in currs] + \
+              [f"24h-Volume ({c})" for c in currs]
     headers = [bold(h) for h in headers]
 
-    floatfmt = ["", "", ""] + [".8f" if c == 'BTC' else ".4f" for c in currencies] + \
-               [".2%" for _ in range(len(currencies) * 2)] + [".4f" if c == 'BTC' else ",.0f" for c in currencies]
+    floatfmt = [""] * 3 + [".8f" if c == 'BTC' else ".4f" for c in currs] + \
+               [".2%" for _ in range(len(currs) * 2)] + \
+               [".4f" if c == 'BTC' else ",.0f" for c in currs]
 
     print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
     # Print the source and timestamp
-    print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - "
+          "{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def print_selection_multitab(selection, sort_value):
@@ -155,24 +168,28 @@ def print_selection_multitab(selection, sort_value):
         selection = sort_selection(selection, sort_value, currency)
 
         for item in selection:
-            price = item.currencies[currency]['price']
-            volume = item.currencies[currency]['volume_24h']
-            percentage_24h = color_percent(item.currencies[currency]['percent_change_24h'])
-            percentage_7d = color_percent(item.currencies[currency]['percent_change_7d'])
-            data = [bold(item.rank), item.symbol, item.name, price, percentage_24h, percentage_7d, volume]
+            currs = item.currencies
+            price = currs[currency]['price']
+            volume = currs[currency]['volume_24h']
+            percent_24h = color_percent(currs[currency]['percent_change_24h'])
+            percent_7d = color_percent(currs[currency]['percent_change_7d'])
+            data = [bold(item.rank), item.symbol, item.name,
+                    price, percent_24h, percent_7d, volume]
             to_print.append(data)
 
-        headers = ["Rank", "Symbol", "Name", f"Price ({currency})", f"24h-Change ({currency})",
-                   f"7d-Change ({currency})", f"24h-Volume ({currency})"]
+        headers = ["Rank", "Symbol", "Name", f"Price ({currency})",
+                   f"24h-Change ({currency})", f"7d-Change ({currency})",
+                   f"24h-Volume ({currency})"]
         headers = [bold(h) for h in headers]
 
-        floatfmt = ["", "", "", f"{'.8f' if currency == 'BTC' else '.4f'}", ".2%",
-                    ".2%", f"{'.4f' if currency == 'BTC' else ',.0f'}"]
+        floatfmt = ["", "", "", f"{'.8f' if currency == 'BTC' else '.4f'}",
+                    ".2%", ".2%", f"{'.4f' if currency == 'BTC' else ',.0f'}"]
 
         print(color(bold("\n> " + currency), "y"))
         print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
     # Print the source and timestamp
-    print(f"\nSource: {color('https://www.coinmarketcap.com', 'w')} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\nSource: {color('https://www.coinmarketcap.com', 'w')} - "
+          "{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def main(currency, symbols, sort_value):
@@ -194,22 +211,27 @@ def main(currency, symbols, sort_value):
 if __name__ == '__main__':
     import argparse
 
-    supported_currencies = ["AUD", "BRL", "CAD", "CHF", "CLP", "CNY", "CZK", "DKK", "EUR",
-                            "GBP", "HKD", "HUF", "IDR", "ILS", "INR", "JPY", "KRW", "MXN",
-                            "MYR", "NOK", "NZD", "PHP", "PKR", "PLN", "RUB", "SEK", "SGD",
-                            "THB", "TRY", "TWD", "ZAR", "BTC", "ETH", "XRP", "LTC", "BCH"]
+    supported_currencies = ["AUD", "BRL", "CAD", "CHF", "CLP", "CNY", "CZK",
+                            "DKK", "EUR", "GBP", "HKD", "HUF", "IDR", "ILS",
+                            "INR", "JPY", "KRW", "MXN", "MYR", "NOK", "NZD",
+                            "PHP", "PKR", "PLN", "RUB", "SEK", "SGD", "THB",
+                            "TRY", "TWD", "ZAR", "BTC", "ETH", "XRP", "LTC",
+                            "BCH"]
     sorts = ["rank", "rank-", "price", "price-", "change_24h", "change_24h-",
              "change_7d", "change_7d-", "volume", "volume-"]
 
-    parser = argparse.ArgumentParser(description='Displays cryptocurrencies data from CMC in the terminal')
+    parser = argparse.ArgumentParser(description='Displays cryptocurrencies '
+                                     'data from CMC in the terminal')
     parser.add_argument('--curr', default='USD', type=str,
-                        help=f'Currency used for the price and volume \
-                        (for more than one, separate them with a comma : USB,BTC). \
-                        Valid currencies: {bold(", ".join(supported_currencies))}')
+                        help=f'Currency used for the price and volume '
+                        '(for more than one, separate them with a comma : '
+                        'USD,BTC). Valid currencies: '
+                        '{bold(", ".join(supported_currencies))}')
     parser.add_argument('--crypto', default=None, type=str,
-                        help='Symbols of the cryptocurrencies to display (default top10).')
+                        help='Symbols of the cryptocurrencies to display '
+                        '(default top10).')
     parser.add_argument('--sort', default='rank-', type=str, choices=sorts,
-                        help='How the cryptocurrencies are sorted in the table.')
+                        help='Cryptocurrencies sorting in the table.')
 
     args = parser.parse_args()
 
@@ -219,8 +241,9 @@ if __name__ == '__main__':
     # Check if the currency is supported by CMC, if not use 'USD'
     for curr in args.curr.split(","):
         if curr not in supported_currencies + ["USD"]:
-            print(color(f"'{args.curr}' is not a valid currency value, using 'USD'", 'm'))
-            args.curr = 'USD'
+            print(color(f"'{args.curr}' is not a valid currency value, "
+                        "using 'USD'", 'm'))
+            args.curr = "USD"
             break
 
     if args.crypto:
