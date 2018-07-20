@@ -100,6 +100,7 @@ def get_top_10(cryptos, convert="USD"):
 
 def get_symbols(cryptos, symbols, convert="USD"):
     selected = set()
+    errors = []
     for symbol in symbols.split(","):
         if symbol in cryptos:
             for conv in convert.split(","):
@@ -107,9 +108,10 @@ def get_symbols(cryptos, symbols, convert="USD"):
                 selected.add(cryptos[symbol])
 
         else:
-            print(color(f"Couldn't find '{symbol}' on CoinMarketCap.com", 'm'))
+            errors.append(color(f"Couldn't find '{symbol}' "
+                                "on CoinMarketCap.com", 'm'))
 
-    return list(selected)
+    return list(selected), "\n".join(errors)
 
 
 def sort_selection(selection, sort_value, curr):
@@ -194,13 +196,13 @@ def print_selection_multitab(selection, sort_value):
           f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def main(currency, symbols, sort_value, clear_scr):
-    # Load the crypto ids from CMC
-    cryptos = load_cmc_ids()
-
+def main(currency, cryptos, symbols, sort_value, clear_scr):
     # Get the tickers of the top 10 cryptos
+    errors = ""
     if symbols:
-        selection = get_symbols(cryptos, symbols, currency)
+        selection, errors = get_symbols(cryptos, symbols, currency)
+        if not selection:
+            selection = get_top_10(cryptos, currency)
     else:
         selection = get_top_10(cryptos, currency)
 
@@ -212,6 +214,9 @@ def main(currency, symbols, sort_value, clear_scr):
     if selection:
         # print_selection_onetab(selection, sort_value)
         print_selection_multitab(selection, sort_value)
+
+    if errors:
+        print(errors)
 
 
 if __name__ == '__main__':
@@ -259,9 +264,12 @@ if __name__ == '__main__':
     if args.crypto:
         args.crypto = args.crypto.upper().replace(" ", "")
 
+    # Load the crypto ids from CMC
+    cmc_cryptos = load_cmc_ids()
+
     while True:
         try:
-            main(args.curr, args.crypto, args.sort, args.delay > 0)
+            main(args.curr, cmc_cryptos, args.crypto, args.sort, args.delay > 0)
             if args.delay > 0:
                 sleep(args.delay)
             else:
