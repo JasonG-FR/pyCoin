@@ -13,6 +13,7 @@ class Crypto(object):
         self.currencies = None
 
     def set_ticker(self, ticker, conv):
+        # TODO: Add price change 7d for custom cryptos
         self.rank = ticker["market_cap_rank"]
         if "percent_change_7d" in ticker:
             data = ticker
@@ -277,7 +278,6 @@ if __name__ == '__main__':
     args.curr = args.curr.upper()
     args.sort = args.sort.lower()
 
-    # TODO: check with CoinGecko for a list of supported currencies
     # Check if the currency is supported by CoinGecko, if not use 'USD'
     for curr in args.curr.split(","):
         if curr not in supported_currencies:
