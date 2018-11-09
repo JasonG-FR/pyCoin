@@ -8,32 +8,31 @@ class Crypto(object):
     def __init__(self, data):
         self.id = data["id"]
         self.name = data["name"]
-        self.symbol = data["symbol"]
-        self.website_slug = data["website_slug"]
+        self.symbol = data["symbol"].upper()
+        self.website_slug = None
         self.currencies = None
 
-    def get_ticker(self, convert="USD"):
-        base_url = "https://api.coinmarketcap.com/v2/"
-        url = f"{base_url}ticker/{self.id}/?convert={convert}"
-        r = requests.get(url, timeout=10)
-
-        if r.status_code == 200:
-            # Add the ticker value from the JSON
-            ticker = r.json()["data"]
-            self.set_ticker(ticker, convert)
-        else:
-            raise ConnectionError(f"{url} [{r.status_code}]")
-
     def set_ticker(self, ticker, conv):
-        self.rank = ticker["rank"]
-        keys = ["price", "volume_24h", "percent_change_24h",
-                "percent_change_7d"]
-        data = {key: ticker["quotes"][conv][key] for key in keys}
+        self.rank = ticker["market_cap_rank"]
+        if "percent_change_7d" in ticker:
+            data = ticker
+        else:
+            keys = ["price", "volume_24h", "percent_change_24h",
+                    "percent_change_7d"]
+            cgecko_keys = ["current_price", "total_volume",
+                           "price_change_percentage_24h", ""]
+
+            data = {}
+            for key, cg_key in zip(keys, cgecko_keys):
+                if key != "percent_change_7d":
+                    data[key] = ticker[cg_key]
+                else:
+                    data[key] = "N/A"
 
         if self.currencies:
-            self.currencies[conv] = data
+            self.currencies[conv.upper()] = data
         else:
-            self.currencies = {conv: data}
+            self.currencies = {conv.upper(): data}
 
 
 class bcolors:
@@ -61,57 +60,77 @@ def color(text, color):
 
 
 def color_percent(value):
-    if value < 0:
+    if value == "N/A":
+        return color(value, "r")
+    elif value < 0:
         return color(value / 100, "r")
     else:
         return color(value / 100, "g")
 
 
-def load_cmc_ids():
+def load_cgecko_ids(symbols: str, currencies: str) -> dict:
     # Get the JSON file from CMC API
-    url = "https://api.coinmarketcap.com/v2/listings/"
+    url = "https://api.coingecko.com/api/v3/coins/list"
     r = requests.get(url, timeout=10)
 
     if r.status_code == 200:
+        data = r.json()
+
         # Parse the JSON into a dict of Crypto objects
-        return {data["symbol"]: Crypto(data) for data in r.json()["data"]}
+        cryptos = {d["symbol"].upper(): Crypto(d) for d in data 
+                   if d["symbol"].upper() in symbols.split(',')}
+
+        # Get a list of CoinGecko ids for the selected cryptos
+        cgecko_ids = [cryptos[key].id for key in cryptos]
+
+        # Get and set all tickers for each currency (fiat) selected
+        url = "https://api.coingecko.com/api/v3/coins/markets"
+        ids = f"ids={','.join(cgecko_ids)}"
+
+        for curr in currencies.split(","):
+            api_curr = f"vs_currency={curr.lower()}"
+            r = requests.get(f"{url}?{api_curr}&{ids}", timeout=10)
+
+            if r.status_code == 200:
+                tickers = r.json()
+                for ticker in tickers:
+                    cryptos[ticker['symbol'].upper()].set_ticker(ticker, curr)
+            else:
+                raise ConnectionError(f"{url}&{curr}&{ids} [{r.status_code}]")
+
+        return cryptos
+
     else:
         raise ConnectionError(f"{url} [{r.status_code}]")
 
 
-def get_top_10(cryptos, convert="USD"):
-    selected = set()
-    base_url = "https://api.coinmarketcap.com/v2/"
-    for conv in convert.split(","):
-        url = f"{base_url}ticker/?limit=10&convert={conv}"
-        r = requests.get(url, timeout=10)
+def get_top_10(convert: str="USD") -> dict:
+    url = "https://api.coingecko.com/api/v3/coins?per_page=10"
+    r = requests.get(url, timeout=10)
 
-        if r.status_code == 200:
-            # Parse the JSON and update the Crypto objects
-            data = r.json()['data']
-            for key in data:
-                cryptos[data[key]["symbol"]].set_ticker(data[key], conv)
-                selected.add(cryptos[data[key]["symbol"]])
-        else:
-            raise ConnectionError(f"{url} [{r.status_code}]")
+    if r.status_code == 200:
+        # Parse the JSON and update the Crypto objects
+        data = r.json()
 
-    return list(selected)
+        cryptos = {d["symbol"].upper(): Crypto(d) for d in data}
 
+        for conv in [c.lower() for c in convert.split(",")]:
+            for d in data:
+                pc24 = 'price_change_percentage_24h_in_currency'
+                pc7 = 'price_change_percentage_7d_in_currency'
+                ticker = {
+                    "market_cap_rank": d['market_data']['market_cap_rank'],
+                    "price": d['market_data']['current_price'][conv],
+                    "volume_24h": d['market_data']['total_volume'][conv],
+                    "percent_change_24h": d['market_data'][pc24][conv],
+                    "percent_change_7d": d['market_data'][pc7][conv]
+                }
+                cryptos[d["symbol"].upper()].set_ticker(ticker, conv)
 
-def get_symbols(cryptos, symbols, convert="USD"):
-    selected = set()
-    errors = []
-    for symbol in symbols.split(","):
-        if symbol in cryptos:
-            for conv in convert.split(","):
-                cryptos[symbol].get_ticker(conv)
-                selected.add(cryptos[symbol])
+    else:
+        raise ConnectionError(f"{url} [{r.status_code}]")
 
-        else:
-            errors.append(color(f"Couldn't find '{symbol}' "
-                                "on CoinMarketCap.com", 'm'))
-
-    return list(selected), "\n".join(errors)
+    return cryptos
 
 
 def sort_selection(selection, sort_value, curr):
@@ -192,19 +211,19 @@ def print_selection_multitab(selection, sort_value):
         print(color(bold("\n> " + currency), "y"))
         print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
     # Print the source and timestamp
-    print(f"\nSource: {color('https://www.coinmarketcap.com', 'w')} - "
+    print(f"\nSource: {color('https://www.coingecko.com', 'w')} - "
           f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def main(currency, cryptos, symbols, sort_value, clear_scr):
-    # Get the tickers of the top 10 cryptos
-    errors = ""
+def main(currencies, symbols, sort_value, clear_scr):
     if symbols:
-        selection, errors = get_symbols(cryptos, symbols, currency)
-        if not selection:
-            selection = get_top_10(cryptos, currency)
+        # Load the crypto ids from CoinGecko
+        cgecko_cryptos = load_cgecko_ids(args.crypto, currencies)
     else:
-        selection = get_top_10(cryptos, currency)
+        # Get the tickers of the top 10 cryptos
+        cgecko_cryptos = get_top_10(currencies)
+    
+    selection = [cgecko_cryptos[key] for key in cgecko_cryptos]
 
     # Clear the screen if needed
     if clear_scr:
@@ -215,19 +234,24 @@ def main(currency, cryptos, symbols, sort_value, clear_scr):
         # print_selection_onetab(selection, sort_value)
         print_selection_multitab(selection, sort_value)
 
+    # TODO: Add some error management: if a crypto doesn't exist nothing is said
+    """
     if errors:
         print(errors)
+    """
 
 
 if __name__ == '__main__':
     import argparse
 
-    supported_currencies = ["AUD", "BRL", "CAD", "CHF", "CLP", "CNY", "CZK",
-                            "DKK", "EUR", "GBP", "HKD", "HUF", "IDR", "ILS",
-                            "INR", "JPY", "KRW", "MXN", "MYR", "NOK", "NZD",
-                            "PHP", "PKR", "PLN", "RUB", "SEK", "SGD", "THB",
-                            "TRY", "TWD", "ZAR", "BTC", "ETH", "XRP", "LTC",
-                            "BCH"]
+    supported_currencies = ['AED', 'ARS', 'AUD', 'BCH', 'BDT', 'BHD', 'BMD', 
+                            'BNB', 'BRL', 'BTC', 'CAD', 'CHF', 'CLP', 'CNY', 
+                            'CZK', 'DKK', 'EOS', 'ETH', 'EUR', 'GBP', 'HKD', 
+                            'HUF', 'IDR', 'ILS', 'INR', 'JPY', 'KRW', 'KWD', 
+                            'LKR', 'LTC', 'MMK', 'MXN', 'MYR', 'NOK', 'NZD', 
+                            'PHP', 'PKR', 'PLN', 'RUB', 'SAR', 'SEK', 'SGD', 
+                            'THB', 'TRY', 'TWD', 'USD', 'VEF', 'XAG', 'XAU', 
+                            'XDR', 'XLM', 'XRP', 'ZAR']
     sorts = ["rank", "rank-", "price", "price-", "change_24h", "change_24h-",
              "change_7d", "change_7d-", "volume", "volume-"]
 
@@ -253,9 +277,10 @@ if __name__ == '__main__':
     args.curr = args.curr.upper()
     args.sort = args.sort.lower()
 
-    # Check if the currency is supported by CMC, if not use 'USD'
+    # TODO: check with CoinGecko for a list of supported currencies
+    # Check if the currency is supported by CoinGecko, if not use 'USD'
     for curr in args.curr.split(","):
-        if curr not in supported_currencies + ["USD"]:
+        if curr not in supported_currencies:
             print(color(f"'{args.curr}' is not a valid currency value, "
                         "using 'USD'", 'm'))
             args.curr = "USD"
@@ -264,12 +289,9 @@ if __name__ == '__main__':
     if args.crypto:
         args.crypto = args.crypto.upper().replace(" ", "")
 
-    # Load the crypto ids from CMC
-    cmc_cryptos = load_cmc_ids()
-
     while True:
         try:
-            main(args.curr, cmc_cryptos, args.crypto, args.sort, args.delay > 0)
+            main(args.curr, args.crypto, args.sort, args.delay > 0)
             if args.delay > 0:
                 sleep(args.delay)
             else:
