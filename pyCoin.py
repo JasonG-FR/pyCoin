@@ -69,7 +69,7 @@ def color_percent(value):
         return color(value / 100, "g")
 
 
-def load_cgecko_ids(symbols: str, currencies: str) -> dict:
+def load_cgecko_ids(symbols: str, currencies: str) -> tuple:
     # Get the JSON file from CMC API
     url = "https://api.coingecko.com/api/v3/coins/list"
     r = requests.get(url, timeout=10)
@@ -78,8 +78,14 @@ def load_cgecko_ids(symbols: str, currencies: str) -> dict:
         data = r.json()
 
         # Parse the JSON into a dict of Crypto objects
-        cryptos = {d["symbol"].upper(): Crypto(d) for d in data 
-                   if d["symbol"].upper() in symbols.split(',')}
+        cryptos, errors = {}, []
+        cgecko_symbs = [d["symbol"] for d in data]
+        for s in symbols.split(","):
+            if s.lower() in cgecko_symbs:
+                cryptos[s.upper()] = Crypto(data[cgecko_symbs.index(s.lower())])
+            else:
+                errors.append(color(f"Couldn't find '{s.upper()}' " \
+                                    "on CoinGecko.com", 'm'))
 
         # Get a list of CoinGecko ids for the selected cryptos
         cgecko_ids = [cryptos[key].id for key in cryptos]
@@ -99,7 +105,7 @@ def load_cgecko_ids(symbols: str, currencies: str) -> dict:
             else:
                 raise ConnectionError(f"{url}&{curr}&{ids} [{r.status_code}]")
 
-        return cryptos
+        return cryptos, "\n".join(errors)
 
     else:
         raise ConnectionError(f"{url} [{r.status_code}]")
@@ -219,7 +225,7 @@ def print_selection_multitab(selection, sort_value):
 def main(currencies, symbols, sort_value, clear_scr):
     if symbols:
         # Load the crypto ids from CoinGecko
-        cgecko_cryptos = load_cgecko_ids(args.crypto, currencies)
+        cgecko_cryptos, errors = load_cgecko_ids(args.crypto, currencies)
     else:
         # Get the tickers of the top 10 cryptos
         cgecko_cryptos = get_top_10(currencies)
@@ -235,11 +241,8 @@ def main(currencies, symbols, sort_value, clear_scr):
         # print_selection_onetab(selection, sort_value)
         print_selection_multitab(selection, sort_value)
 
-    # TODO: Add some error management: if a crypto doesn't exist nothing is said
-    """
     if errors:
         print(errors)
-    """
 
 
 if __name__ == '__main__':
