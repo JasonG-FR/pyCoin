@@ -5,35 +5,39 @@ from time import sleep
 
 
 class Crypto(object):
-    def __init__(self, data):
+    def __init__(self, data: dict) -> None:
         self.id = data["id"]
         self.name = data["name"]
         self.symbol = data["symbol"].upper()
         self.website_slug = None
         self.currencies = None
 
-    def set_ticker(self, ticker, conv):
+    def set_ticker(self, ticker: dict, currencies: str) -> None:
         # TODO: Add price change 7d for custom cryptos
         self.rank = ticker["market_cap_rank"]
         if "percent_change_7d" in ticker:
             data = ticker
+
+            if self.currencies:
+                self.currencies[currencies.upper()] = data
+            else:
+                self.currencies = {currencies.upper(): data}
         else:
             keys = ["price", "volume_24h", "percent_change_24h",
                     "percent_change_7d"]
             cgecko_keys = ["current_price", "total_volume",
-                           "price_change_percentage_24h", ""]
+                           "price_change_percentage_24h_in_currency", 
+                           "price_change_percentage_7d_in_currency"]
 
-            data = {}
-            for key, cg_key in zip(keys, cgecko_keys):
-                if key != "percent_change_7d":
-                    data[key] = ticker[cg_key]
+            for currency in currencies.split(","):
+                data = {}
+                for key, cg_key in zip(keys, cgecko_keys):
+                    data[key] = ticker[cg_key][currency.lower()]
+
+                if self.currencies:
+                    self.currencies[currency.upper()] = data
                 else:
-                    data[key] = "N/A"
-
-        if self.currencies:
-            self.currencies[conv.upper()] = data
-        else:
-            self.currencies = {conv.upper(): data}
+                    self.currencies = {currency.upper(): data}
 
 
 class bcolors:
@@ -69,7 +73,7 @@ def color_percent(value):
         return color(value / 100, "g")
 
 
-def load_cgecko_ids(symbols: str, currencies: str) -> tuple:
+def load_cgecko_cryptos(symbols: str) -> tuple:
     # Get the JSON file from CMC API
     url = "https://api.coingecko.com/api/v3/coins/list"
     r = requests.get(url, timeout=10)
@@ -86,29 +90,27 @@ def load_cgecko_ids(symbols: str, currencies: str) -> tuple:
             else:
                 errors.append(color(f"Couldn't find '{s.upper()}' " \
                                     "on CoinGecko.com", 'm'))
-
-        # Get a list of CoinGecko ids for the selected cryptos
-        cgecko_ids = [cryptos[key].id for key in cryptos]
-
-        # Get and set all tickers for each currency (fiat) selected
-        url = "https://api.coingecko.com/api/v3/coins/markets"
-        ids = f"ids={','.join(cgecko_ids)}"
-
-        for curr in currencies.split(","):
-            api_curr = f"vs_currency={curr.lower()}"
-            r = requests.get(f"{url}?{api_curr}&{ids}", timeout=10)
-
-            if r.status_code == 200:
-                tickers = r.json()
-                for ticker in tickers:
-                    cryptos[ticker['symbol'].upper()].set_ticker(ticker, curr)
-            else:
-                raise ConnectionError(f"{url}&{curr}&{ids} [{r.status_code}]")
-
         return cryptos, "\n".join(errors)
 
     else:
         raise ConnectionError(f"{url} [{r.status_code}]")
+
+
+def update_tickers(cryptos: dict, currencies: str) -> None:
+    # Get and set all tickers for each crypto selected
+    url = "https://api.coingecko.com/api/v3/coins/{}?" \
+          "localization=false&tickers=false&community_data=false" \
+          "&developer_data=false&sparkline=false"
+
+    datas = []
+    for key in cryptos:
+        key_url = url.format(cryptos[key].id)
+        r = requests.get(key_url, timeout=10)
+
+        if r.status_code == 200:
+            cryptos[key].set_ticker(r.json()["market_data"], currencies)
+        else:
+            raise ConnectionError(f"{key_url} [{r.status_code}]")
 
 
 def get_top_10(convert: str="USD") -> dict:
@@ -222,15 +224,15 @@ def print_selection_multitab(selection, sort_value):
           f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-def main(currencies, symbols, sort_value, clear_scr):
-    if symbols:
+def main(currencies, cryptos, sort_value, clear_scr):
+    if cryptos:
         # Load the crypto ids from CoinGecko
-        cgecko_cryptos, errors = load_cgecko_ids(args.crypto, currencies)
+        update_tickers(cryptos, currencies)
     else:
         # Get the tickers of the top 10 cryptos
-        cgecko_cryptos = get_top_10(currencies)
+        cryptos = get_top_10(currencies)
     
-    selection = [cgecko_cryptos[key] for key in cgecko_cryptos]
+    selection = [cryptos[key] for key in cryptos]
 
     # Clear the screen if needed
     if clear_scr:
@@ -240,9 +242,6 @@ def main(currencies, symbols, sort_value, clear_scr):
     if selection:
         # print_selection_onetab(selection, sort_value)
         print_selection_multitab(selection, sort_value)
-
-    if errors:
-        print(errors)
 
 
 if __name__ == '__main__':
@@ -289,12 +288,17 @@ if __name__ == '__main__':
             args.curr = "USD"
             break
 
+    cryptos = {}
     if args.crypto:
         args.crypto = args.crypto.upper().replace(" ", "")
+        cryptos, errors = load_cgecko_cryptos(args.crypto)
+
+        if errors:
+            print(errors)
 
     while True:
         try:
-            main(args.curr, args.crypto, args.sort, args.delay > 0)
+            main(args.curr, cryptos, args.sort, args.delay > 0)
             if args.delay > 0:
                 sleep(args.delay)
             else:
