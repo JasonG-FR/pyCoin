@@ -1,7 +1,16 @@
 import requests
+import threading
+
 from tabulate import tabulate
 from datetime import datetime
 from time import sleep
+
+
+class Thread(threading.Thread):
+    def __init__(self, url, cryptos, currencies, key):
+        threading.Thread.__init__(self, target=update_ticker, 
+                                  args=(url, cryptos, currencies, key))
+        self.start()
 
 
 class Crypto(object):
@@ -96,21 +105,25 @@ def load_cgecko_cryptos(symbols: str) -> tuple:
         raise ConnectionError(f"{url} [{r.status_code}]")
 
 
+def update_ticker(url: str, cryptos: dict, currencies: str, key: str) -> None:
+    key_url = url.format(cryptos[key].id)
+    r = requests.get(key_url, timeout=10)
+
+    if r.status_code == 200:
+        with lock:
+            cryptos[key].set_ticker(r.json()["market_data"], currencies)
+    else:
+        raise ConnectionError(f"{key_url} [{r.status_code}]")
+
+
 def update_tickers(cryptos: dict, currencies: str) -> None:
     # Get and set all tickers for each crypto selected
     url = "https://api.coingecko.com/api/v3/coins/{}?" \
           "localization=false&tickers=false&community_data=false" \
           "&developer_data=false&sparkline=false"
 
-    datas = []
-    for key in cryptos:
-        key_url = url.format(cryptos[key].id)
-        r = requests.get(key_url, timeout=10)
-
-        if r.status_code == 200:
-            cryptos[key].set_ticker(r.json()["market_data"], currencies)
-        else:
-            raise ConnectionError(f"{key_url} [{r.status_code}]")
+    threads = [Thread(url, cryptos, currencies, key) for key in cryptos]
+    [t.join() for t in threads]  # Wait until all threads are done to continue
 
 
 def get_top_10(convert: str="USD") -> dict:
@@ -242,6 +255,9 @@ def main(currencies, cryptos, sort_value, clear_scr):
     if selection:
         # print_selection_onetab(selection, sort_value)
         print_selection_multitab(selection, sort_value)
+
+
+lock = threading.Lock()
 
 
 if __name__ == '__main__':
