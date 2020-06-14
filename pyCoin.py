@@ -83,7 +83,7 @@ def color_percent(value):
 
 
 def load_cgecko_cryptos(symbols: str) -> tuple:
-    # Get the JSON file from CMC API
+    # Get the JSON file from CoinGecko API
     url = "https://api.coingecko.com/api/v3/coins/list"
     r = requests.get(url, timeout=10)
 
@@ -166,44 +166,6 @@ def sort_selection(selection, sort_value, curr):
                   reverse="-" not in sort_value)
 
 
-def print_selection_onetab(selection, sort_value):
-    # Generate a list of lists containing the data to print
-    to_print = []
-
-    # Sort the selection
-    selection = sort_selection(selection, sort_value,
-                               selection[0].currencies[0])
-
-    for item in selection:
-        currs = item.currencies
-        prices = [currs[c]['price'] for c in currs]
-        volumes = [currs[c]['volume_24h'] for c in currs]
-        percent_24h = [color_percent(currs[c]['percent_change_24h'])
-                       for c in currs]
-        percent_7d = [color_percent(currs[c]['percent_change_7d'])
-                      for c in currs]
-
-        data = [bold(item.rank), item.symbol, item.name]
-        data += prices + percent_24h + percent_7d + volumes
-        to_print.append(data)
-
-    currs = selection[0].currencies
-    headers = ["Rank", "Symbol", "Name"] + [f"Price ({c})" for c in currs] + \
-              [f"24h-Change ({c})" for c in currs] + \
-              [f"7d-Change ({c})" for c in currs] + \
-              [f"24h-Volume ({c})" for c in currs]
-    headers = [bold(h) for h in headers]
-
-    floatfmt = [""] * 3 + [".8f" if c == 'BTC' else ".4f" for c in currs] + \
-               [".2%" for _ in range(len(currs) * 2)] + \
-               [".4f" if c == 'BTC' else ",.0f" for c in currs]
-
-    print(tabulate(to_print, headers=headers, floatfmt=floatfmt))
-    # Print the source and timestamp
-    print(f"\nSource: {color('https://www.coinmarketcap.com', 'b')} - "
-          f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-
 def print_selection_multitab(selection, sort_value):
     for currency in selection[0].currencies:
         # Generate a list of lists containing the data to print
@@ -253,7 +215,6 @@ def main(currencies, cryptos, sort_value, clear_scr):
 
     # Print the selection if any
     if selection:
-        # print_selection_onetab(selection, sort_value)
         print_selection_multitab(selection, sort_value)
 
 
